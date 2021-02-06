@@ -1,0 +1,55 @@
+---
+title: "Amazon Book Sales"
+author: "Mingwei Wu"
+date: "2/5/2021"
+output: html_notebook
+---
+
+## Data Background
+## The data is from amazon webiste for best sellers of 2010-2020 (Top 100 books)
+
+## Import R library
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dbplyr)
+library(caret)
+library(car)
+```
+## Import Data
+```{r}
+bs<-read.csv("amazon_bs_20102020.csv",header=TRUE)
+head(bs)
+```
+## Check data duplicated values and missing values
+```{r}
+dim(bs)
+```
+```{r}
+na.omit(bs)%>%
+  dim() #the data is completed
+```
+```{r}
+bs%>%distinct()%>%
+  dim()
+```
+```{r}
+bs<-bs%>%
+  rename(Customers_review = "Num_Customers_Rated")
+```
+
+```{r}
+pairs(~Rating+Customers_review+Price, data=bs) # The graph display that with increased Rating, the Customers_review is increased. it also happens with Price, but not obviously
+```
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
