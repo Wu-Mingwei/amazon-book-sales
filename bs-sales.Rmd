@@ -2,7 +2,9 @@
 title: "Amazon Book Sales"
 author: "Mingwei Wu"
 date: "2/5/2021"
-output: html_notebook
+output:
+  pdf_document: default
+  html_notebook: default
 ---
 
 ## Data Background
@@ -15,6 +17,7 @@ library(ggplot2)
 library(dbplyr)
 library(caret)
 library(car)
+library(sqldf)
 ```
 ## Import Data
 ```{r}
@@ -38,18 +41,175 @@ bs<-bs%>%
   rename(Customers_review = "Num_Customers_Rated")
 ```
 
+### Top 100 sellers are having higher Rathing by customers,and price is not expensive.
 ```{r}
-pairs(~Rating+Customers_review+Price, data=bs) # The graph display that with increased Rating, the Customers_review is increased. it also happens with Price, but not obviously
+pairs(~Rank+Rating+Customers_review+Price, data=bs) # The graph display that with increased Rating, the Customers_review is increased. it also happens with Price, but not obviously.
+```
+### As increased with year, cuntomers increase their reaction and comment. Assume that people get used to spend the time on internet, also express their subjectiveness.
+```{r}
+year_reviw<-bs%>%
+  group_by(Year)%>%
+  summarise(review=sum(Customers_review))
+```
+### The below scatter plot and line desmonstrate the customers' review and Year  that have linear relationship. and the tendency is going up.
+```{r}
+year_reviw%>%
+  ggplot(aes(review,Year))+geom_point(color="red")+geom_smooth(method="lm")
 ```
 ```{r}
+head(bs)
+```
+```{r}
+sqldf("select *
+      from bs
+      group by Book_Title
+      order by Customers_review desc
+      limit 10") # the most customer review is the book, 'Where the Crawdads Sing' that best seller rank 70 with Rating 4.8 and Price 4.58 on 2018.
+```
 
+```{r}
+sqldf("select count(distinct Author) as author
+      from bs")  # In 10 years, amazon book top 100 best sellers has 436 authors
+```
+```{r}
+sqldf("select Author
+      from bs 
+      group by Author
+      having count(Author) > 1
+      limit 10") # data is having 217 authors who were best sellers more than 1 within 10 years
+```
+
+```{r}
+sqldf("select Author,count(Author) as best_sellers_frequency
+      from bs
+      group by Author
+      having count(Author) > 1
+      order by count(Author) desc
+      limit 10") #within 217 authors who were best sellers more than 1 between 2010 to 2020. The Author 'Rick Riordan' is number one who appear in top_100 18 times.
+```
+```{r}
+bs%>%
+  filter(Author == "Rick Riordan")%>%
+  select(Year,Rank,Book_Title,Rating,Customers_review,Price)%>%
+  arrange(Rank)# His best rank is 7 in 2013, and worst rank is 89 in 2017.
+```
+```{r}
+bs%>%
+  filter(Author == "Rick Riordan")%>%
+  arrange(Rank)%>%
+  summarise(avg_rating = mean(Rating)) # he gained 4.78 rating of his book sales.
+```
+
+```{r}
+bs%>%
+  filter(Author == "Rick Riordan")%>%
+  select(Year,Rank,Book_Title,Rating,Customers_review,Price)%>%
+  arrange(Rank)%>%
+  group_by(Year)%>%
+  count()# the arrange of frequency of his best seller time. He has 5 books are best sales in 2010
+```
+```{r}
+bs%>%
+  filter(Author == "Rick Riordan" & Year == 2010)%>%
+  select(Book_Title,Rating,Customers_review,Price)
+```
+```{r}
+bs1<-bs%>%
+  filter(Year %in% c(2017,2018,2019,2020))
+```
+
+```{r}
+sqldf("select * 
+      from bs1
+      order by Customers_review desc
+      limit 10") # where query order by customers_review , the data has the duplicated book appear twice in 2019. previously, the data does not include any missing values and duplicated values. we see the rank 1 of 2019 and rank 63 of 2019 are same book but difference price. assume that has promotion to decrease the price to induce customer for sales.
+```
+```{r}
+sqldf("select count(distinct Book_Title) as uni_book
+      from bs1") #257 unique books in 399 observations between 2017 to 2020
+```
+```{r}
+ad_price<-sqldf("select *
+      from bs1
+      group by Book_Title
+      having count(Book_Title) > 1") #extra the data which is more than once in 2017 to 2020
+```
+
+
+```{r}
+head(ad_price)
+```
+```{r}
+ad_price%>%
+  ggplot(aes(Price,Rank))+geom_point()+geom_abline() # confirm again the Price and Rank do not have linear relationship
 ```
 
 
 
+```{r}
+sqldf("select *
+      from bs1
+      order by Rating desc
+      limit 6") # best rating is 4.9 and worst rating is 4.0. 
+```
+### Since average rating is 4.7 in 2017 to 2020 top book sales. we define the 4.7 as minium level as quality book.
+```{r}
+bs1%>%
+  summarise(avg_rating = mean(Rating)) # average rating is 4.7
+```
+```{r}
+ad_rating<-bs1%>%
+  filter(Rating > 4.7) #extract the quality book
+```
 
+```{r}
+head(ad_rating)
+```
 
+### The below histogram chart displays the rating of book. according to the graph, amazon top book sales are increased their quality with year. means that the quality of readers are raised and more chase to the good book. the requirement of customers is going up too.
+```{r}
+ad_rating%>%
+  ggplot(aes(Year))+geom_histogram(color ="blue",fill="white",bins = 30)+ylab("rating_amount")+ggtitle("4.7 rating above rating histogram")
+```
 
+### Altought the price does not have linear relationship with rank, we still want to check the price because the rank is according to sales' amount.
+```{r}
+bs1%>%
+  arrange(desc(Price))%>%
+  group_by(Author)%>%
+  head(50) # extract top 50 expensive book in 2017 to 2020
+```
 
+```{r}
+bs1%>%
+  group_by(Author)%>%
+  count()%>%
+  arrange(desc(n))%>%
+  head()#best author in 2017 to 2020
+```
+### Since the Dav Pikey appear 10 and Wizards RPG Team appear 7 times. base on the query to analysis what kind of the book is tendency on 2017 to 2020.
+```{r}
+bs_author_2017_2020<-bs1%>%
+  filter(Author=="Dav Pilkey" | Author == "Wizards RPG Team")
+```
+
+```{r}
+bs_author_2017_2020%>%
+  arrange(desc(Price))
+```
+```{r}
+sqldf("select Author,count(distinct Book_Title) as book_quantity
+      from bs_author_2017_2020
+      group by Author")
+```
+### After the analysis, even the author: Dav Pilkey has mutiple book appear to top book sales, but his price is not higher, and his book basiclly like cartoon story. we can assume that the book sells higher because the story is pre-school education. On other side, the Wizards RPG Team sells 4 books which are related to game guide. Even book price is bit higher, but still make a good sales of quantity. Also, only 4 books customers' review is bit higher than Dav Pilkey.
+```{r}
+bs_author_2017_2020%>%
+  group_by(Author)%>%
+  summarise(total_customer_review=sum(Customers_review))
+```
+
+# Conclusion
+## The information about Amazon top book sales given by this data is predictive. We can make recommended books on the website according to the data to increase the amount of visits, clicks and purchases of customers.Also, it can absorb potential authors and help them better promote their books.At the same time, according to the analysis of books from 2017 to 2020, people's purchasing power, quality demand, and rate of review interaction has increased significantly.Moreover, the genre of books sold has shifted from storytelling to games and pre-school education.The data show that book buyers are young people and families with children.On the other hand, it also shows part of the purchasing power of life habits, which can be corresponding to the recommendation of companion products, such as game, game equipment or children's products.
 
 
